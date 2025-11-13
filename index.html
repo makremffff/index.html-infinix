@@ -22,13 +22,12 @@
     .cartoon-btn{flex:1 1 0;aspect-ratio:1/1;border:none;border-radius:14px;background:#000;color:#fff;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;top:0;box-shadow:0 6px 0 #444,0 8px 8px rgba(0,0,0,.25);transition:all .1s ease;user-select:none;text-align:center;line-height:1.1}
     .cartoon-btn:active{top:4px;box-shadow:0 2px 0 #444,0 3px 4px rgba(0,0,0,.25)}
     .badge{position:absolute;top:-6px;right:-6px;background:#8b0000;color:#fff;font-size:11px;border-radius:10px;padding:3px 6px;min-width:18px;text-align:center}
-
-    #refUI{display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;gap:16px}
-    #refUI h3{color:#8b0000;font-size:18px}
-    #refUI .link-box{background:#111;border-radius:8px;padding:8px 12px;font-size:14px;color:#00ff41;font-family:'Digital-7',monospace;text-shadow:0 0 2px #00ff41;max-width:90%;word-break:break-all}
-    #refUI .copy-btn{background:#8b0000;color:#fff;border:none;border-radius:12px;padding:10px 24px;font-weight:600;cursor:pointer;box-shadow:0 4px 0 #600,0 6px 6px rgba(0,0,0,.25)}
-    #refUI .copy-btn:active{transform:translateY(2px);box-shadow:0 2px 0 #600,0 3px 4px rgba(0,0,0,.25)}
-    #refUI .count{font-size:16px;color:#333}
+    .panel{display:none;flex-direction:column;padding:24px;gap:16px;text-align:center;color:#000}
+    .panel input,.panel button{padding:10px;font-size:14px;border-radius:8px;border:none}
+    .panel input{background:#eee;color:#000}
+    .panel button{background:#8b0000;color:#fff;font-weight:600;cursor:pointer}
+    .panel button:active{transform:translateY(2px)}
+    .panel .back{margin-top:auto;margin-bottom:20px;width:120px}
   </style>
 </head>
 <body>
@@ -50,9 +49,9 @@
         <span>Points</span>
       </div>
       <div class="btn-bar">
-        <button class="cartoon-btn">Task</button>
-        <button class="cartoon-btn">Swap</button>
-        <button class="cartoon-btn">Withdraw</button>
+        <button class="cartoon-btn" onclick="showPanel('taskPanel')">Task</button>
+        <button class="cartoon-btn" onclick="showPanel('swapPanel')">Swap</button>
+        <button class="cartoon-btn" onclick="showPanel('withdrawPanel')">Withdraw</button>
         <button class="cartoon-btn" id="watchBtn">
           Watch
           <span class="badge" id="watchBadge">15</span>
@@ -61,13 +60,32 @@
       </div>
     </div>
 
-    <!-- Referral UI -->
-    <div id="refUI">
-      <h3>Share Your Link & Earn!</h3>
-      <div class="link-box" id="refLink"></div>
-      <button class="copy-btn" id="copyLinkBtn">Copy Link</button>
-      <div class="count">Referrals: <b id="refCount">0</b></div>
-      <button class="cartoon-btn" style="margin-top:auto;margin-bottom:20px;width:120px" onclick="showMain()">Back</button>
+    <!-- Swap Panel -->
+    <div id="swapPanel" class="panel">
+      <h3>Swap Points to USDT</h3>
+      <p>100,000 Points = 0.01 USDT</p>
+      <input type="number" id="swapInput" placeholder="Enter points (min 100k)" min="100000" step="100000">
+      <button onclick="handleSwap()">Swap</button>
+      <button class="back" onclick="showMain()">Back</button>
+    </div>
+
+    <!-- Withdraw Panel -->
+    <div id="withdrawPanel" class="panel">
+      <h3>Withdraw USDT</h3>
+      <input type="text" id="binanceId" placeholder="Binance User ID">
+      <input type="number" id="withdrawAmount" placeholder="Amount (min 0.03)" min="0.03" step="0.01">
+      <button onclick="handleWithdraw()">Withdraw</button>
+      <button class="back" onclick="showMain()">Back</button>
+    </div>
+
+    <!-- Task Panel -->
+    <div id="taskPanel" class="panel">
+      <h3>Tasks</h3>
+      <div style="text-align:left;font-size:14px">
+        <p>🔹 Join Channel: <b>0.01 USDT</b> <button onclick="completeTask('channel')">Claim</button></p>
+        <p>🔹 Watch 250 Ads: <b>0.02 USDT</b> <button onclick="completeTask('ads')">Claim</button></p>
+      </div>
+      <button class="back" onclick="showMain()">Back</button>
     </div>
 
   </div>
@@ -75,111 +93,151 @@
 
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script>
-  /* ---------- CONFIG ---------- */
-  const BOT_USERNAME = 'YOUR_BOT_USERNAME'; // ← change only here (no @)
+  /***********************  index.js  *************************/
+  const BOT_USERNAME = 'Game_win_usdtBot';
 
-  /* ---------- UTILS ---------- */
   const $ = id => document.getElementById(id);
-  const mainUI   = $('mainUI');
-  const refUI    = $('refUI');
-  const refLinkEl= $('refLink');
-  const refCountEl=$('refCount');
-  const copyBtn  = $('copyBtn');
-  const copyLinkBtn=$('copyLinkBtn');
+  const mainUI = $('mainUI');
 
-  /* ---------- TELEGRAM CHECK & STORE ---------- */
   window.Telegram.WebApp.ready();
   const initData = window.Telegram.WebApp.initDataUnsafe;
-
-  if(!initData || !initData.user){
-    alert('Please open this mini-app through your bot on Telegram.');
+  if (!initData?.user) {
+    document.body.innerHTML = '<h2 style="text-align:center;margin-top:40px;">Please open this mini-app from Telegram.</h2>';
     throw new Error('User not authenticated');
   }
-
   const user = initData.user;
-  const userKey = 'tgUser_'+user.id;
 
-  // first visit → save profile
-  if(!localStorage.getItem(userKey)){
-    const profile = {
-      id        : user.id,
-      first_name: user.first_name||'',
-      last_name : user.last_name ||'',
-      username  : user.username  ||'',
-      photo_url : user.photo_url ||''
-    };
-    localStorage.setItem(userKey, JSON.stringify(profile));
-  }
-
-  /* ---------- REFERRAL ---------- */
-  const refKey = 'refCount_'+user.id;
-  let refCount = parseInt(localStorage.getItem(refKey))||0;
-  const refLink = `https://t.me/${BOT_USERNAME}/earn?startapp=ref_${user.id}`;
-
-  function showRef(){
-    mainUI.style.display='none';
-    refUI.style.display='flex';
-    refLinkEl.textContent = refLink;
-    refCountEl.textContent= refCount;
-  }
-  function showMain(){
-    refUI.style.display='none';
-    mainUI.style.display='flex';
-  }
-  copyBtn.addEventListener('click', showRef);
-  copyLinkBtn.addEventListener('click',()=>{
-    navigator.clipboard.writeText(refLink).then(()=>{
-      copyLinkBtn.textContent='✓ Copied!';
-      setTimeout(()=>copyLinkBtn.textContent='Copy Link',1500);
+  // دالة موحدة للـAPI
+  async function api(action, params = {}) {
+    const res = await fetch(`/api.js?action=${action}&userID=${user.id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params)
     });
-  });
-
-  /* ---------- DISPLAY USER PIC / NAME ---------- */
-  if(user.photo_url){
-    const img=$('userPhoto');
-    img.src=user.photo_url;
-    img.style.display='block';
+    return res.json();
   }
-  const fullName = [user.first_name,user.last_name].filter(Boolean).join(' ');
-  document.title = fullName || 'LED Counter';
 
-  /* ---------- WATCH ADS (POINTS ONLY) ---------- */
-  const watchBtn  = $('watchBtn');
-  const watchBadge= $('watchBadge');
-  const pointsVal = $('pointsVal');
-  const usdtVal   = $('usdtVal');
-
-  let counter=15, cooldown=0, points=0;
-
-  function fmtMMSS(s){const m=Math.floor(s/60);return `${m}:${(s%60).toString().padStart(2,'0')}`;}
-  function updateWatchBtn(){
-    if(cooldown>0){watchBtn.disabled=true; watchBadge.textContent=fmtMMSS(cooldown);}
-    else{watchBtn.disabled=false; watchBadge.textContent=counter;}
+  // حالة العداد والكول داون (محلي فقط)
+  const LS_KEY = `st_${user.id}`;
+  let counter = 15, cooldown = 0;
+  function loadState() {
+    try { const s = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); counter = s.counter ?? 15; cooldown = s.cooldown ?? 0; } catch {}
   }
-  watchBtn.addEventListener('click',()=>{
-    if(cooldown>0)return;
-    if(counter<=0){
-      cooldown=60*60;
-      updateWatchBtn();
-      const iv=setInterval(()=>{
-        cooldown--;
-        updateWatchBtn();
-        if(cooldown<=0){clearInterval(iv); counter=15; updateWatchBtn();}
-      },1000);
+  function saveState() { localStorage.setItem(LS_KEY, JSON.stringify({ counter, cooldown })); }
+
+  // تسجيل المستخدم
+  async function registerUser() {
+    const ref = new URLSearchParams(window.location.search).get('startapp')?.replace('ref_', '') || null;
+    await api('registerUser', {
+      firstName: user.first_name || '',
+      lastName: user.last_name || '',
+      username: user.username || '',
+      photoURL: user.photo_url || '',
+      ref
+    });
+  }
+
+  // جلب البيانات
+  async function loadProfile() {
+    const { success, data } = await api('getProfile');
+    if (success) {
+      $('#pointsVal').textContent = data.points.toLocaleString();
+      $('#usdtVal').textContent = parseFloat(data.usdt).toFixed(2);
+      $('#refCount').textContent = data.referrals;
+    }
+  }
+
+  // عرض اللوحات
+  function showPanel(id) {
+    mainUI.style.display = 'none';
+    document.querySelectorAll('.panel').forEach(p => p.style.display = 'none');
+    $(id).style.display = 'flex';
+  }
+  function showMain() {
+    document.querySelectorAll('.panel').forEach(p => p.style.display = 'none');
+    mainUI.style.display = 'flex';
+  }
+
+  // Swap
+  async function handleSwap() {
+    const input = parseInt($('swapInput').value);
+    if (isNaN(input) || input < 100000 || input % 100000 !== 0) return alert('Minimum 100,000 and multiples only');
+    const { success, message } = await api('swap', { points: input });
+    alert(success ? 'Swapped successfully!' : message);
+    $('swapInput').value = '';
+    await loadProfile();
+  }
+
+  // Withdraw
+  async function handleWithdraw() {
+    const binanceId = $('binanceId').value.trim();
+    const amount = parseFloat($('withdrawAmount').value);
+    if (!binanceId) return alert('Enter Binance ID');
+    if (isNaN(amount) || amount < 0.03) return alert('Minimum 0.03 USDT');
+    const { success, message } = await api('withdraw', { binanceId, amount });
+    alert(success ? `Withdrawal request sent!\nBinance ID: ${binanceId}\nAmount: ${amount.toFixed(2)} USDT` : message);
+    $('binanceId').value = '';
+    $('withdrawAmount').value = '';
+    await loadProfile();
+  }
+
+  // Tasks
+  async function completeTask(type) {
+    const { success, message } = await api('completeTask', { type });
+    alert(success ? 'Task completed!' : message);
+    await loadProfile();
+  }
+
+  // Watch Ad
+  $('#watchBtn').addEventListener('click', async () => {
+    if (cooldown > 0) return;
+    if (counter <= 0) {
+      cooldown = 3600;
+      saveState();
+      startCooldown();
       return;
     }
-    counter--; points+=1000;
-    pointsVal.textContent=points.toLocaleString();
-    usdtVal.textContent='0.00';           // USDT stays zero
-    updateWatchBtn();
+    const { success } = await api('watchAd');
+    if (success) { counter--; saveState(); await loadProfile(); updateWatchBtn(); }
   });
 
-  /* ---------- CLOCK ---------- */
-  function updateTime(){
-    const now=new Date(), h=now.getHours().toString().padStart(2,'0'), m=now.getMinutes().toString().padStart(2,'0');
-    document.querySelector('.time').textContent=`${h}:${m}`;
+  // Copy referral
+  $('#copyBtn').addEventListener('click', () => {
+    const link = `https://t.me/${BOT_USERNAME}/earn?startapp=ref_${user.id}`;
+    navigator.clipboard.writeText(link).then(() => alert('Referral link copied!'));
+  });
+
+  // عداد التبريد
+  function startCooldown() {
+    const iv = setInterval(() => {
+      cooldown = Math.max(0, cooldown - 1);
+      saveState();
+      updateWatchBtn();
+      if (cooldown === 0) { clearInterval(iv); counter = 15; saveState(); updateWatchBtn(); }
+    }, 1000);
   }
-  updateTime(); setInterval(updateTime,1000);
+  function fmtMMSS(s) { const m = Math.floor(s / 60); return `${m}:${(s % 60).toString().padStart(2, '0')}`; }
+  function updateWatchBtn() {
+    const btn = $('#watchBtn'); const badge = $('#watchBadge');
+    btn.disabled = cooldown > 0;
+    badge.textContent = cooldown > 0 ? fmtMMSS(cooldown) : counter;
+  }
+
+  // تهيئة أولية
+  (async () => {
+    loadState();
+    await registerUser();
+    await loadProfile();
+    updateWatchBtn();
+    if (cooldown > 0) startCooldown();
+  })();
+
+  // الساعة
+  function updateTime() {
+    const now = new Date();
+    document.querySelector('.time').textContent = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+  }
+  updateTime(); setInterval(updateTime, 1000);
 </script>
 </body>
 </html>
