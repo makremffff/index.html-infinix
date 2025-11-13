@@ -67,12 +67,119 @@
       <div class="link-box" id="refLink"></div>
       <button class="copy-btn" id="copyLinkBtn">Copy Link</button>
       <div class="count">Referrals: <b id="refCount">0</b></div>
-      <button class="cartoon-btn" style="margin-top:auto;margin-bottom:20px;width:120px">Back</button>
+      <button class="cartoon-btn" style="margin-top:auto;margin-bottom:20px;width:120px" onclick="showMain()">Back</button>
     </div>
 
   </div>
 </div>
 
-<script src="index.js"></script>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script>
+  /* ---------- CONFIG ---------- */
+  const BOT_USERNAME = 'YOUR_BOT_USERNAME'; // ← change only here (no @)
+
+  /* ---------- UTILS ---------- */
+  const $ = id => document.getElementById(id);
+  const mainUI   = $('mainUI');
+  const refUI    = $('refUI');
+  const refLinkEl= $('refLink');
+  const refCountEl=$('refCount');
+  const copyBtn  = $('copyBtn');
+  const copyLinkBtn=$('copyLinkBtn');
+
+  /* ---------- TELEGRAM CHECK & STORE ---------- */
+  window.Telegram.WebApp.ready();
+  const initData = window.Telegram.WebApp.initDataUnsafe;
+
+  if(!initData || !initData.user){
+    alert('Please open this mini-app through your bot on Telegram.');
+    throw new Error('User not authenticated');
+  }
+
+  const user = initData.user;
+  const userKey = 'tgUser_'+user.id;
+
+  // first visit → save profile
+  if(!localStorage.getItem(userKey)){
+    const profile = {
+      id        : user.id,
+      first_name: user.first_name||'',
+      last_name : user.last_name ||'',
+      username  : user.username  ||'',
+      photo_url : user.photo_url ||''
+    };
+    localStorage.setItem(userKey, JSON.stringify(profile));
+  }
+
+  /* ---------- REFERRAL ---------- */
+  const refKey = 'refCount_'+user.id;
+  let refCount = parseInt(localStorage.getItem(refKey))||0;
+  const refLink = `https://t.me/${BOT_USERNAME}/earn?startapp=ref_${user.id}`;
+
+  function showRef(){
+    mainUI.style.display='none';
+    refUI.style.display='flex';
+    refLinkEl.textContent = refLink;
+    refCountEl.textContent= refCount;
+  }
+  function showMain(){
+    refUI.style.display='none';
+    mainUI.style.display='flex';
+  }
+  copyBtn.addEventListener('click', showRef);
+  copyLinkBtn.addEventListener('click',()=>{
+    navigator.clipboard.writeText(refLink).then(()=>{
+      copyLinkBtn.textContent='✓ Copied!';
+      setTimeout(()=>copyLinkBtn.textContent='Copy Link',1500);
+    });
+  });
+
+  /* ---------- DISPLAY USER PIC / NAME ---------- */
+  if(user.photo_url){
+    const img=$('userPhoto');
+    img.src=user.photo_url;
+    img.style.display='block';
+  }
+  const fullName = [user.first_name,user.last_name].filter(Boolean).join(' ');
+  document.title = fullName || 'LED Counter';
+
+  /* ---------- WATCH ADS (POINTS ONLY) ---------- */
+  const watchBtn  = $('watchBtn');
+  const watchBadge= $('watchBadge');
+  const pointsVal = $('pointsVal');
+  const usdtVal   = $('usdtVal');
+
+  let counter=15, cooldown=0, points=0;
+
+  function fmtMMSS(s){const m=Math.floor(s/60);return `${m}:${(s%60).toString().padStart(2,'0')}`;}
+  function updateWatchBtn(){
+    if(cooldown>0){watchBtn.disabled=true; watchBadge.textContent=fmtMMSS(cooldown);}
+    else{watchBtn.disabled=false; watchBadge.textContent=counter;}
+  }
+  watchBtn.addEventListener('click',()=>{
+    if(cooldown>0)return;
+    if(counter<=0){
+      cooldown=60*60;
+      updateWatchBtn();
+      const iv=setInterval(()=>{
+        cooldown--;
+        updateWatchBtn();
+        if(cooldown<=0){clearInterval(iv); counter=15; updateWatchBtn();}
+      },1000);
+      return;
+    }
+    counter--; points+=1000;
+    pointsVal.textContent=points.toLocaleString();
+    usdtVal.textContent='0.00';           // USDT stays zero
+    updateWatchBtn();
+  });
+
+  /* ---------- CLOCK ---------- */
+  function updateTime(){
+    const now=new Date(), h=now.getHours().toString().padStart(2,'0'), m=now.getMinutes().toString().padStart(2,'0');
+    document.querySelector('.time').textContent=`${h}:${m}`;
+  }
+  updateTime(); setInterval(updateTime,1000);
+</script>
 </body>
 </html>
