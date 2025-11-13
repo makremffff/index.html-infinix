@@ -1,66 +1,96 @@
-// عناصر LED
-const usdtVal    = document.getElementById('usdtVal');
-const pointsVal  = document.getElementById('pointsVal');
+// index.js
+(() => {
+  const $ = id => document.getElementById(id);
 
-// زر Watch + شارته
-const watchBtn   = document.getElementById('watchBtn');
-const watchBadge = document.getElementById('watchBadge');
+  const mainUI      = $('mainUI');
+  const refUI       = $('refUI');
+  const refLinkEl   = $('refLink');
+  const refCountEl  = $('refCount');
+  const copyBtn     = $('copyBtn');
+  const copyLinkBtn = $('copyLinkBtn');
+  const watchBtn    = $('watchBtn');
+  const watchBadge  = $('watchBadge');
+  const pointsVal   = $('pointsVal');
+  const usdtVal     = $('usdtVal');
 
-// باقي الأزرار
-const taskBtn    = document.querySelector('.cartoon-btn');      // أول زر (Task)
-const swapBtn    = document.querySelectorAll('.cartoon-btn')[1]; // ثاني زر (Swap)
-const withdrawBtn= document.querySelectorAll('.cartoon-btn')[2]; // ثالث زر (Withdraw)
-const copyBtn    = document.querySelectorAll('.cartoon-btn')[4]; // خامس زر (Copy)
-
-// متغيّرات العمل
-let counter = 15;
-let cooldown = 0;
-let points  = 0;
-
-// مساعدة تنسيق الوقت
-function fmtMMSS(s){const m=Math.floor(s/60);return `${m}:${(s%60).toString().padStart(2,'0')}`;}
-
-// تحديث زر Watch
-function updateWatchBtn(){
-  if(cooldown > 0){
-    watchBtn.disabled = true;
-    watchBadge.textContent = fmtMMSS(cooldown);
-  }else{
-    watchBtn.disabled = false;
-    watchBadge.textContent = counter;
+  /* ---------- منطق الإحالة ---------- */
+  function showRef() {
+    mainUI.style.display = 'none';
+    refUI.style.display  = 'flex';
+    refLinkEl.textContent = refLink;
+    refCountEl.textContent = refCount;
   }
-}
+  function showMain() {
+    refUI.style.display  = 'none';
+    mainUI.style.display = 'flex';
+  }
+  copyBtn.addEventListener('click', showRef);
+  copyLinkBtn.addEventListener('click', () => {
+    navigator.clipboard.writeText(refLink).then(() => {
+      copyLinkBtn.textContent = '✓ Copied!';
+      setTimeout(() => copyLinkBtn.textContent = 'Copy Link', 1500);
+    });
+  });
 
-// منطق زر Watch
-watchBtn.addEventListener('click',()=>{
-  if(cooldown>0) return;
-  if(counter<=0){
-    cooldown=60*60;
-    updateWatchBtn();
-    const cd=setInterval(()=>{
-      cooldown--;
+  /* ---------- زر المشاهدة ---------- */
+  let counter = 15, cooldown = 0, points = 0;
+  function fmtMMSS(s) {
+    const m = Math.floor(s / 60);
+    return `${m}:${(s % 60).toString().padStart(2, '0')}`;
+  }
+  function updateWatchBtn() {
+    if (cooldown > 0) {
+      watchBtn.disabled = true;
+      watchBadge.textContent = fmtMMSS(cooldown);
+    } else {
+      watchBtn.disabled = false;
+      watchBadge.textContent = counter;
+    }
+  }
+  watchBtn.addEventListener('click', () => {
+    if (cooldown > 0) return;
+    if (counter <= 0) {
+      cooldown = 60 * 60;
       updateWatchBtn();
-      if(cooldown<=0){clearInterval(cd);counter=15;updateWatchBtn();}
-    },1000);
-    return;
+      const iv = setInterval(() => {
+        cooldown--;
+        updateWatchBtn();
+        if (cooldown <= 0) {
+          clearInterval(iv);
+          counter = 15;
+          updateWatchBtn();
+        }
+      }, 1000);
+      return;
+    }
+    counter--;
+    points += 1000;
+    pointsVal.textContent = points.toLocaleString();
+    usdtVal.textContent = '0.00';
+    updateWatchBtn();
+  });
+
+  /* ---------- الساعة ---------- */
+  function updateTime() {
+    const now = new Date();
+    const h = now.getHours().toString().padStart(2, '0');
+    const m = now.getMinutes().toString().padStart(2, '0');
+    document.querySelector('.time').textContent = `${h}:${m}`;
   }
-  counter--;
-  points+=1000;
-  pointsVal.textContent=points.toLocaleString();
-  usdtVal.textContent=(points/10000).toFixed(2);
-  updateWatchBtn();
-});
+  updateTime();
+  setInterval(updateTime, 1000);
 
-// تفاعل باقي الأزرار
-taskBtn.addEventListener('click',()=>alert('Task button clicked!'));
-swapBtn.addEventListener('click',()=>alert('Swap button clicked!'));
-withdrawBtn.addEventListener('click',()=>alert('Withdraw button clicked!'));
-copyBtn.addEventListener('click',()=>alert('Copy button clicked!'));
-
-// تحديث الساعة
-function updateTime(){
-  const now=new Date();
-  document.querySelector('.time').textContent=
-    `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
-}
-updateTime(); setInterval(updateTime,1000);
+  /* ---------- قراءة الإحالة ---------- */
+  let ref = '';
+  try {
+    const initData = window.Telegram?.WebApp?.initDataUnsafe;
+    if (initData?.start_param) ref = initData.start_param;
+  } catch {}
+  if (!ref) {
+    const params = new URLSearchParams(location.search);
+    ref = params.get('ref') || '';
+  }
+  console.log('Ref captured:', ref);
+  const statusEl = document.getElementById('status');
+  if (statusEl) statusEl.textContent = ref;
+})();
