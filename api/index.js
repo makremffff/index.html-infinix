@@ -1,4 +1,4 @@
-// /api/index.js
+// /api/index.js - نسخة فعلية تعمل مع Supabase
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -6,13 +6,14 @@ function restHeaders() {
   return {
     "apikey": SUPABASE_ANON_KEY,
     "Authorization": "Bearer " + SUPABASE_ANON_KEY,
-    "Content-Type": "application/json"
+    "Content-Type": "application/json",
+    "Prefer": "return=representation"
   };
 }
 
 module.exports = async function(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -26,7 +27,7 @@ module.exports = async function(req, res) {
   try {
     switch (action) {
       case 'registerUser': {
-        // Check if user exists
+        // التحقق من وجود المستخدم
         const getRes = await fetch(
           `${SUPABASE_URL}/rest/v1/players?user_id=eq.${userID}&select=*`,
           { headers: restHeaders() }
@@ -41,12 +42,13 @@ module.exports = async function(req, res) {
           });
         }
 
-        // Create new user
+        // إنشاء مستخدم جديد
         const newUser = {
           user_id: userID,
           points: 0,
           usdt: 0,
-          referrals: 0
+          referrals: 0,
+          created_at: new Date().toISOString()
         };
 
         const insertRes = await fetch(
@@ -60,20 +62,31 @@ module.exports = async function(req, res) {
 
         if (!insertRes.ok) throw new Error('Insert failed');
 
-        // Handle referral if present
+        // معالجة الإحالة
         if (ref && ref.startsWith('ref_')) {
           const referrerId = ref.replace('ref_', '');
-          await fetch(
-            `${SUPABASE_URL}/rest/v1/players?user_id=eq.${referrerId}`,
-            {
-              method: 'PATCH',
-              headers: restHeaders(),
-              body: JSON.stringify({
-                referrals: 1,
-                points: 2500
-              })
-            }
+          
+          // الحصول على بيانات المُحيل
+          const referrerRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/players?user_id=eq.${referrerId}&select=*`,
+            { headers: restHeaders() }
           );
+          const referrer = await referrerRes.json();
+
+          if (referrer.length > 0) {
+            // تحديث بيانات المُحيل
+            await fetch(
+              `${SUPABASE_URL}/rest/v1/players?user_id=eq.${referrerId}`,
+              {
+                method: 'PATCH',
+                headers: restHeaders(),
+                body: JSON.stringify({
+                  referrals: referrer[0].referrals + 1,
+                  points: referrer[0].points + 2500
+                })
+              }
+            );
+          }
         }
 
         return res.status(201).json({
@@ -105,25 +118,40 @@ module.exports = async function(req, res) {
       }
 
       case 'watchAd': {
+        // الحصول on بيانات المستخدم الحالية
+        const getRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/players?user_id=eq.${userID}&select=*`,
+          { headers: restHeaders() }
+        );
+        const user = await getRes.json();
+
+        if (user.length === 0) {
+          return res.status(404).json({
+            success: false,
+            message: 'User not found'
+          });
+        }
+
+        // تحديث النقاط
         const patchRes = await fetch(
           `${SUPABASE_URL}/rest/v1/players?user_id=eq.${userID}`,
           {
             method: 'PATCH',
             headers: restHeaders(),
             body: JSON.stringify({
-              points: 1000
+              points: user[0].points + 1000
             })
           }
         );
 
         if (!patchRes.ok) throw new Error('Update failed');
 
-        // Return updated profile
-        const getRes = await fetch(
+        // إرجاع البيانات المحدثة
+        const updatedRes = await fetch(
           `${SUPABASE_URL}/rest/v1/players?user_id=eq.${userID}&select=*`,
           { headers: restHeaders() }
         );
-        const updated = await getRes.json();
+        const updated = await updatedRes.json();
 
         return res.status(200).json({
           success: true,
@@ -139,10 +167,10 @@ module.exports = async function(req, res) {
         });
     }
   } catch (err) {
-    console.error(err);
+    console.error('API Error:', err);
     return res.status(500).json({
       success: false,
-      message: 'Server error'
+      message: 'Server error: ' + err.message
     });
   }
 };
