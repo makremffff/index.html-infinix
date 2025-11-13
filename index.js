@@ -1,30 +1,53 @@
 // index.js
 (() => {
-  const $ = id => document.getElementById(id);
+  /* ---------- عناصر DOM ---------- */
+  const userPhoto     = document.getElementById('userPhoto');
+  const mainUI        = document.getElementById('mainUI');
+  const refUI         = document.getElementById('refUI');
+  const refLinkEl     = document.getElementById('refLink');
+  const refCountEl    = document.getElementById('refCount');
+  const copyBtn       = document.getElementById('copyBtn');
+  const copyLinkBtn   = document.getElementById('copyLinkBtn');
+  const watchBtn      = document.getElementById('watchBtn');
+  const watchBadge    = document.getElementById('watchBadge');
+  const pointsVal     = document.getElementById('pointsVal');
+  const usdtVal       = document.getElementById('usdtVal');
+  const timeEl        = document.querySelector('.time');
 
-  const mainUI      = $('mainUI');
-  const refUI       = $('refUI');
-  const refLinkEl   = $('refLink');
-  const refCountEl  = $('refCount');
-  const copyBtn     = $('copyBtn');
-  const copyLinkBtn = $('copyLinkBtn');
-  const watchBtn    = $('watchBtn');
-  const watchBadge  = $('watchBadge');
-  const pointsVal   = $('pointsVal');
-  const usdtVal     = $('usdtVal');
+  /* ---------- بيانات المستخدم ---------- */
+  let userId, userName, userPic;
+  if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
+    const u = window.Telegram.WebApp.initDataUnsafe.user;
+    userId   = u.id;
+    userName = [u.first_name, u.last_name].filter(Boolean).join(' ') || 'User';
+    userPic  = u.photo_url || '';
+  } else {
+    // خارج Telegram
+    userId   = localStorage.getItem('guestId') || 'g_' + Math.random().toString(36).slice(2);
+    localStorage.setItem('guestId', userId);
+    userName = 'Guest';
+    userPic  = '';
+  }
 
-  /* ---------- منطق الإحالة ---------- */
+  /* ---------- رابط الإحالة ---------- */
+  const BOT_USERNAME = 'YOUR_BOT_USERNAME'; // غيِّره لاحقًا
+  const refLink      = `https://t.me/${BOT_USERNAME}/earn?startapp=ref_${userId}`;
+
+  /* ---------- وظائف التبديل ---------- */
   function showRef() {
     mainUI.style.display = 'none';
     refUI.style.display  = 'flex';
     refLinkEl.textContent = refLink;
-    refCountEl.textContent = refCount;
+    refCountEl.textContent = localStorage.getItem('refCount_' + userId) || '0';
   }
   function showMain() {
     refUI.style.display  = 'none';
     mainUI.style.display = 'flex';
   }
   copyBtn.addEventListener('click', showRef);
+  document.querySelector('#refUI .cartoon-btn').addEventListener('click', showMain);
+
+  /* ---------- نسخ الرابط ---------- */
   copyLinkBtn.addEventListener('click', () => {
     navigator.clipboard.writeText(refLink).then(() => {
       copyLinkBtn.textContent = '✓ Copied!';
@@ -32,7 +55,7 @@
     });
   });
 
-  /* ---------- زر المشاهدة ---------- */
+  /* ---------- زر Watch ---------- */
   let counter = 15, cooldown = 0, points = 0;
   function fmtMMSS(s) {
     const m = Math.floor(s / 60);
@@ -63,34 +86,32 @@
       }, 1000);
       return;
     }
-    counter--;
-    points += 1000;
+    counter--; points += 1000;
     pointsVal.textContent = points.toLocaleString();
-    usdtVal.textContent = '0.00';
+    usdtVal.textContent   = '0.00';
     updateWatchBtn();
   });
 
   /* ---------- الساعة ---------- */
   function updateTime() {
     const now = new Date();
-    const h = now.getHours().toString().padStart(2, '0');
-    const m = now.getMinutes().toString().padStart(2, '0');
-    document.querySelector('.time').textContent = `${h}:${m}`;
+    timeEl.textContent = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
   }
-  updateTime();
-  setInterval(updateTime, 1000);
+  updateTime(); setInterval(updateTime, 1000);
+
+  /* ---------- عرض صورة المستخدم ---------- */
+  if (userPic) {
+    userPhoto.src = userPic;
+    userPhoto.style.display = 'block';
+  }
 
   /* ---------- قراءة الإحالة ---------- */
-  let ref = '';
-  try {
-    const initData = window.Telegram?.WebApp?.initDataUnsafe;
-    if (initData?.start_param) ref = initData.start_param;
-  } catch {}
-  if (!ref) {
+  let ref = null;
+  if (window.Telegram?.WebApp?.initDataUnsafe?.start_param) {
+    ref = window.Telegram.WebApp.initDataUnsafe.start_param;
+  } else {
     const params = new URLSearchParams(location.search);
-    ref = params.get('ref') || '';
+    ref = params.get('ref') || params.get('startapp');
   }
-  console.log('Ref captured:', ref);
-  const statusEl = document.getElementById('status');
-  if (statusEl) statusEl.textContent = ref;
+  console.log('Detected ref:', ref);
 })();
