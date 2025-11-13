@@ -1,4 +1,4 @@
-// index.js
+// index.js – الواجهة الأمامية (Front-End) – تعمل محليًا ومع الـ API الحقيقي
 (() => {
   /* ---------- عناصر DOM ---------- */
   const userPhoto     = document.getElementById('userPhoto');
@@ -13,6 +13,9 @@
   const pointsVal     = document.getElementById('pointsVal');
   const usdtVal       = document.getElementById('usdtVal');
   const timeEl        = document.querySelector('.time');
+
+  /* ---------- إعدادات API ---------- */
+  const API_BASE = window.location.origin + '/api'; // نفس النطاق عند النشر على Vercel
 
   /* ---------- بيانات المستخدم ---------- */
   let userId, userName, userPic;
@@ -30,10 +33,10 @@
   }
 
   /* ---------- رابط الإحالة ---------- */
-  const BOT_USERNAME = 'YOUR_BOT_USERNAME'; // غيِّره لاحقًا
+  const BOT_USERNAME = 'Game_win_usdtBot'; // غيّره لاحقًا
   const refLink      = `https://t.me/${BOT_USERNAME}/earn?startapp=ref_${userId}`;
 
-  /* ---------- وظائف التبديل ---------- */
+  /* ---------- واجهة الإحالة ---------- */
   function showRef() {
     mainUI.style.display = 'none';
     refUI.style.display  = 'flex';
@@ -47,7 +50,6 @@
   copyBtn.addEventListener('click', showRef);
   document.querySelector('#refUI .cartoon-btn').addEventListener('click', showMain);
 
-  /* ---------- نسخ الرابط ---------- */
   copyLinkBtn.addEventListener('click', () => {
     navigator.clipboard.writeText(refLink).then(() => {
       copyLinkBtn.textContent = '✓ Copied!';
@@ -55,8 +57,39 @@
     });
   });
 
+  /* ---------- دوال API ---------- */
+  async function apiCall(action, extra = {}) {
+    const params = new URLSearchParams({ action, userID: userId, ...extra });
+    const res = await fetch(`${API_BASE}?${params}`);
+    const json = await res.json();
+    return json;
+  }
+
+  async function loadProfile() {
+    const { success, data } = await apiCall('getProfile');
+    if (success) {
+      pointsVal.textContent = data.points.toLocaleString();
+      usdtVal.textContent   = data.usdt.toFixed(2);
+      localStorage.setItem('refCount_' + userId, data.referrals);
+    }
+  }
+
+  /* ---------- تسجيل المستخدم (مع معالجة الإحالة) ---------- */
+  (async () => {
+    let ref = null;
+    if (window.Telegram?.WebApp?.initDataUnsafe?.start_param) {
+      ref = window.Telegram.WebApp.initDataUnsafe.start_param;
+    } else {
+      const params = new URLSearchParams(location.search);
+      ref = params.get('ref') || params.get('startapp');
+    }
+    await apiCall('registerUser', { ref });
+    await loadProfile();
+  })();
+
   /* ---------- زر Watch ---------- */
-  let counter = 15, cooldown = 0, points = 0;
+  let counter = 15, cooldown = 0;
+
   function fmtMMSS(s) {
     const m = Math.floor(s / 60);
     return `${m}:${(s % 60).toString().padStart(2, '0')}`;
@@ -70,7 +103,8 @@
       watchBadge.textContent = counter;
     }
   }
-  watchBtn.addEventListener('click', () => {
+
+  watchBtn.addEventListener('click', async () => {
     if (cooldown > 0) return;
     if (counter <= 0) {
       cooldown = 60 * 60;
@@ -86,9 +120,12 @@
       }, 1000);
       return;
     }
-    counter--; points += 1000;
-    pointsVal.textContent = points.toLocaleString();
-    usdtVal.textContent   = '0.00';
+    counter--;
+    const { success, data } = await apiCall('watchAd');
+    if (success) {
+      pointsVal.textContent = data.points.toLocaleString();
+      usdtVal.textContent   = data.usdt.toFixed(2);
+    }
     updateWatchBtn();
   });
 
@@ -104,14 +141,4 @@
     userPhoto.src = userPic;
     userPhoto.style.display = 'block';
   }
-
-  /* ---------- قراءة الإحالة ---------- */
-  let ref = null;
-  if (window.Telegram?.WebApp?.initDataUnsafe?.start_param) {
-    ref = window.Telegram.WebApp.initDataUnsafe.start_param;
-  } else {
-    const params = new URLSearchParams(location.search);
-    ref = params.get('ref') || params.get('startapp');
-  }
-  console.log('Detected ref:', ref);
 })();
