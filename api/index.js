@@ -1,90 +1,115 @@
-// api/index.js
+// /api/index.js
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 function restHeaders() {
   return {
-    "apikey": SUPABASE_ANON_KEY,
-    "Authorization": "Bearer " + SUPABASE_ANON_KEY,
-    "Content-Type": "application/json"
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    "Content-Type": "application/json",
+    Prefer: "return=representation"
   };
 }
 
-module.exports = async function(req, res) {
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
-  try {
-    const { action, userID, ref } = req.query;
+module.exports = async function (req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
+  if (req.method === "OPTIONS") return res.status(200).end();
+
+  const { action, userID, ref } = req.query;
+
+  if (!action) return res.status(400).json({ success: false, message: "Missing action" });
+
+  try {
     /* ---------- registerUser ---------- */
     if (action === "registerUser") {
-      // 1) هل المستخدم موجود؟
-      const checkRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/players?user_id=eq.${userID}&select=*`,
+      // check exists
+      const check = await fetch(
+        `${SUPABASE_URL}/rest/v1/players?user_id=eq.${userID}`,
         { headers: restHeaders() }
-      );
-      const exist = await checkRes.json();
+      ).then(r => r.json());
 
-      if (exist.length) {
-        return res.status(200).json({ success: true, data: exist[0], message: "User already exists" });
+      if (check.length) {
+        return res.json({ success: true, data: check[0], message: "User exists" });
       }
 
-      // 2) إنشاء الحساب الجديد
-      const body = { user_id: userID, points: 0, usdt: 0, referrals: 0 };
-      const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/players`, {
+      // create
+      const body = { user_id: userID, usdt: 0, points: 0, referrals: 0 };
+      const created = await fetch(`${SUPABASE_URL}/rest/v1/players`, {
         method: "POST",
         headers: restHeaders(),
         body: JSON.stringify(body)
-      });
-      if (!insertRes.ok) throw new Error("Insert failed");
+      }).then(r => r.json());
 
-      // 3) مكافأة المُحيل (إن وُجد)
+      // reward referrer if provided
       if (ref && ref !== userID) {
         await fetch(
           `${SUPABASE_URL}/rest/v1/players?user_id=eq.${ref}`,
-          {
-            method: "PATCH",
-            headers: restHeaders(),
-            body: JSON.stringify({
-              points: 5000,
-              usdt: 0.25,
-              referrals: 1
-            })
-          }
-        );
+          { headers: restHeaders() }
+        )
+          .then(r => r.json())
+          .then(async rows => {
+            if (rows.length) {
+              const r = rows[0];
+              await fetch(
+                `${SUPABASE_URL}/rest/v1/players?user_id=eq.${ref}`,
+                {
+                  method: "PATCH",
+                  headers: restHeaders(),
+                  body: JSON.stringify({
+                    referrals: r.referrals + 1,
+                    points: r.points + 2500
+                  })
+                }
+              );
+            }
+          });
       }
 
-      return res.status(201).json({ success: true, data: body, message: "User registered" });
+      return res.json({ success: true, data: created[0], message: "User registered" });
     }
 
     /* ---------- getProfile ---------- */
     if (action === "getProfile") {
-      const profileRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/players?user_id=eq.${userID}&select=*`,
+      const rows = await fetch(
+        `${SUPABASE_URL}/rest/v1/players?user_id=eq.${userID}`,
         { headers: restHeaders() }
-      );
-      const data = await profileRes.json();
-      if (!data.length) return res.status(404).json({ success: false, message: "User not found" });
-      return res.status(200).json({ success: true, data: data[0] });
+      ).then(r => r.json());
+
+      if (!rows.length)
+        return res.status(404).json({ success: false, message: "User not found" });
+
+      return res.json({ success: true, data: rows[0] });
     }
 
-    /* ---------- addPoints ---------- */
-    if (action === "addPoints") {
-      const { amount } = req.query; // amount=1000 (مثلاً)
-      const patchRes = await fetch(
+    /* ---------- watchAd ---------- */
+    if (action === "watchAd") {
+      const rows = await fetch(
+        `${SUPABASE_URL}/rest/v1/players?user_id=eq.${userID}`,
+        { headers: restHeaders() }
+      ).then(r => r.json());
+
+      if (!rows.length)
+        return res.status(404).json({ success: false, message: "User not found" });
+
+      const user = rows[0];
+      const updated = await fetch(
         `${SUPABASE_URL}/rest/v1/players?user_id=eq.${userID}`,
         {
           method: "PATCH",
           headers: restHeaders(),
-          body: JSON.stringify({ points: amount })
+          body: JSON.stringify({ points: user.points + 1000 })
         }
-      );
-      if (!patchRes.ok) throw new Error("Update failed");
-      return res.status(200).json({ success: true, message: "Points added" });
+      ).then(r => r.json());
+
+      return res.json({ success: true, data: updated[0], message: "Ad watched" });
     }
 
-    return res.status(400).json({ success: false, message: "Invalid action" });
+    return res.status(400).json({ success: false, message: "Unknown action" });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ success: false, message: err.message });
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
