@@ -1,16 +1,19 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ar">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Referrals</title>
+  <title>نظام الإحالات</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{
       height:100vh;
       background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
-      display:flex;align-items:center;justify-content:center;
-      overflow:hidden;font-family:Arial,sans-serif;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+      font-family:Arial,sans-serif;
     }
     .iphone{
       width:90vw;height:90vh;max-width:420px;max-height:910px;
@@ -31,70 +34,20 @@
       background:#764ba2;border:none;padding:10px 20px;border-radius:10px;
       color:#fff;font-size:16px;cursor:pointer;margin-top:10px;
     }
-    /* Loader */
-    .loader{
-      width:50px;height:50px;
-      border:5px solid rgba(255,255,255,.2);
-      border-top-color:#fff;
-      border-radius:50%;
-      animation:spin 1s linear infinite;
-      margin:10px auto;
-    }
-    @keyframes spin{to{transform:rotate(360deg)}}
-
-    /* Tasks button - pencil style */
-    #tasksBtn{
-      position:absolute;
-      bottom:20px;left:20px;
-      background:none;border:none;
-      color:#ccc;font-size:18px;
-      font-family:'Comic Sans MS',cursive;
-      cursor:pointer;text-decoration:underline;
-      text-shadow:0 0 1px #ccc;
-    }
-
-    /* Tasks popup */
-    #tasksPopup{
-      display:none;
-      position:absolute;
-      top:50%;left:50%;
-      transform:translate(-50%,-50%);
-      background:#222;color:#fff;
-      padding:20px;border-radius:15px;
-      text-align:center;z-index:10;
-    }
+    #refLink{word-wrap:break-word;margin-top:10px;font-size:12px;color:#ccc;}
   </style>
 </head>
 <body>
   <div class="iphone">
     <div class="screen">
       <div class="notch"></div>
-
-      <!-- Loading -->
-      <div id="status">
-        <div class="loader"></div>
-      </div>
-
+      <h2>📱 نظام الإحالات</h2>
+      <p id="status">جارٍ الاتصال...</p>
       <p id="profile"></p>
-
-      <!-- Tasks button -->
-      <button id="tasksBtn" style="display:none;">Tasks</button>
-
-      <!-- Tasks popup -->
-      <div id="tasksPopup">
-        <p>Each referral = 2500 points</p>
-        <p id="referralCountPopup">Your referrals: 0</p>
-        <button id="copyRefInsidePopup">🔗 Copy referral link</button>
-        <br><br>
-        <button onclick="document.getElementById('tasksPopup').style.display='none'">Close</button>
-      </div>
-
-      <!-- Hidden link storage -->
-      <p id="refLink" style="display:none;"></p>
+      <button id="copyRef" style="display:none;">🔗 نسخ رابط الإحالة</button>
+      <p id="refLink"></p>
     </div>
   </div>
-
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="index.js"></script>
 </body>
 </html>
