@@ -1,53 +1,81 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>نظام الإحالات</title>
+  <meta charset="utf-8">
+  <title>iPhone LED Counters</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <link href="https://fonts.googleapis.com/css2?family=Digital-7&family=Poppins:wght@600&display=swap" rel="stylesheet">
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    body{
-      height:100vh;
-      background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      overflow:hidden;
-      font-family:Arial,sans-serif;
-    }
+    html,body{height:100%;font-family:'Poppins',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+
     .iphone{
-      width:90vw;height:90vh;max-width:420px;max-height:910px;
-      position:relative;background:#000;border-radius:40px;
-      box-shadow:0 0 0 2px #2a2a2a,0 0 0 12px #000,0 0 0 14px #333,0 25px 50px rgba(0,0,0,0.5);
-      overflow:hidden;color:#fff;
+      width:100%;height:100%;background:#fff;
+      display:flex;align-items:center;justify-content:center;overflow:hidden;
     }
     .screen{
-      width:100%;height:100%;background:#000;position:relative;
-      display:flex;flex-direction:column;align-items:center;justify-content:center;
-      text-align:center;padding:20px;
+      width:93.5%;max-width:437px;aspect-ratio:1/1.86;
+      background:linear-gradient(135deg,#f5f5f5 0%,#e1e1e1 100%);
+      border-radius:36px;border:3px solid #8b0000;
+      box-shadow:0 0 0 6px #8b000030, 0 0 15px 4px #8b000050;
+      display:flex;flex-direction:column;position:relative;padding:8px;
     }
-    .notch{
-      position:absolute;top:0;left:50%;transform:translateX(-50%);
-      width:210px;height:30px;background:#000;border-radius:0 0 20px 20px;z-index:2;
+    .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:24px;background:#000;border-radius:0 0 18px 18px;z-index:10;}
+
+    .status-bar{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;color:#000;font-size:13px;font-weight:500;}
+    .status-bar .time{font-weight:600}.status-bar .icons span{margin-left:4px}
+
+    .led-bar{
+      display:flex;justify-content:space-between;align-items:center;
+      padding:6px 16px 8px;font-size:14px;font-weight:600;color:#000;
     }
-    button{
-      background:#764ba2;border:none;padding:10px 20px;border-radius:10px;
-      color:#fff;font-size:16px;cursor:pointer;margin-top:10px;
+    .led-box{
+      background:#111;border-radius:8px;padding:4px 8px;
+      box-shadow:inset 0 0 4px rgba(0,0,0,.6);
     }
-    #refLink{word-wrap:break-word;margin-top:10px;font-size:12px;color:#ccc;}
+    .led-num{
+      font-family:'Digital-7',monospace;font-size:18px;font-weight:400;
+      color:#00ff41;text-shadow:0 0 2px #00ff41,0 0 4px #00ff41;
+    }
+    .led-usdt .led-num{color:#ffa500;text-shadow:0 0 2px #ffa500,0 0 4px #ffa500;}
+
+    .btn-bar{margin-top:auto;display:flex;justify-content:space-evenly;padding:8px 4px 12px;gap:6px}
+    .cartoon-btn{flex:1 1 0;aspect-ratio:1/1;border:none;border-radius:14px;background:#000;color:#fff;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;top:0;box-shadow:0 6px 0 #444,0 8px 8px rgba(0,0,0,.25);transition:all .1s ease;user-select:none;text-align:center;line-height:1.1}
+    .cartoon-btn:active{top:4px;box-shadow:0 2px 0 #444,0 3px 4px rgba(0,0,0,.25)}
+    .badge{position:absolute;top:-6px;right:-6px;background:#8b0000;color:#fff;font-size:11px;border-radius:10px;padding:3px 6px;min-width:18px;text-align:center}
   </style>
 </head>
 <body>
-  <div class="iphone">
-    <div class="screen">
-      <div class="notch"></div>
-      <h2>📱 نظام الإحالات</h2>
-      <p id="status">جارٍ الاتصال...</p>
-      <p id="profile"></p>
-      <button id="copyRef" style="display:none;">🔗 نسخ رابط الإحالة</button>
-      <p id="refLink"></p>
+<div class="iphone">
+  <div class="screen">
+    <div class="notch"></div>
+
+    <div class="status-bar">
+      <span class="time">9:41</span>
+      <span class="icons"><span>📶</span><span>🔋</span></span>
+    </div>
+
+    <div class="led-bar">
+      <span>USDT</span>
+      <div class="led-box led-usdt"><span class="led-num" id="usdtVal">0.00</span></div>
+
+      <div class="led-box"><span class="led-num" id="pointsVal">0</span></div>
+      <span>Points</span>
+    </div>
+
+    <div class="btn-bar">
+      <button class="cartoon-btn">Task</button>
+      <button class="cartoon-btn">Swap</button>
+      <button class="cartoon-btn">Withdraw</button>
+      <button class="cartoon-btn" id="watchBtn">
+        Watch
+        <span class="badge" id="watchBadge">15</span>
+      </button>
+      <button class="cartoon-btn">Copy</button>
     </div>
   </div>
-  <script src="index.js"></script>
+</div>
+
+<script src="index.js"></script>
 </body>
 </html>
